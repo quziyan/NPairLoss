@@ -12,12 +12,6 @@
 #include "caffe/util/math_functions.hpp"
 
 namespace caffe{
-	/*
-	const Dtype* I = bottom[0]->cpu_data();
-	const Dtype* f_x = bottom[1]->cpu_data();
-	const Dtype* f_y = bottom[2]->cpu_data();
-	//const Dtype* s = bottom[3]->cpu_data();
-	*/
 	//bottom[0] data
 	//bottom[1] label
 

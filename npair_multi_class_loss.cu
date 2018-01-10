@@ -23,23 +23,20 @@ namespace caffe{
 		  int count = this_query_num * fea_dim;//this->local_feature_->count();
 		  const Dtype * sendbuf = this->local_feature_->cpu_data();
 		  Dtype * recvbuf = this->total_feature_->mutable_cpu_data();
-		  //LOG(INFO)<<"LOG_0";
+		  
 		  int count_label = this->local_label_->count();
 		  const Dtype * send_label = this->local_label_->cpu_data();
 		  Dtype * recv_label = this->total_label_->mutable_cpu_data();
 		  
 		  if (sizeof(Dtype) == 4) {
-		    //MPI_Gather(sendbuf, count, MPI_FLOAT, recvbuf, count, MPI_FLOAT, 0, MPI_COMM_WORLD);
-		    //MPI_Bcast(recvbuf, count, MPI_FLOAT, 0, MPI_COMM_WORLD);
 		    MPI_Allgather(sendbuf, count, MPI_FLOAT, recvbuf, count, MPI_FLOAT, MPI_COMM_WORLD);
-		    //LOG(INFO) << "All-gather feature ok...";
+		    
 		    MPI_Allgather(send_label, count_label, MPI_FLOAT, recv_label, count_label, MPI_FLOAT, MPI_COMM_WORLD);
-		    //LOG(INFO)<<"LOG_2_1";
-		    //LOG(INFO) << "All-gather label ok...";
+		    
 		  } else if(sizeof(Dtype) == 8) {
 		    MPI_Allgather(sendbuf, count, MPI_DOUBLE, recvbuf, count, MPI_DOUBLE, MPI_COMM_WORLD);
 		    MPI_Allgather(send_label, count_label, MPI_DOUBLE, recv_label, count_label, MPI_DOUBLE, MPI_COMM_WORLD);
-		    //LOG(INFO)<<"LOG_2_2";
+		    
 		  } else {
 		    LOG(FATAL) << "Error size of Dtype: " << sizeof(Dtype);
 		  }   
@@ -80,12 +77,6 @@ namespace caffe{
 
 			is_select_pair_mtx[index] = 0;
 			if(same_mtx[index] == 1) {
-				/*
-				//正样本全选，不挑
-                //if(same_mtx[index] > (max_between_dot[query_idx])
-                if(innerProd[index] > (max_between_dot[query_idx] + min_within_dot[query_idx]) / 2)
-				    is_select_pair_mtx[index] = 1;
-				    */
 				if(posi_select_method == 0){ //HARD
 					if(innerProd[index] < posi_thresholds[query_idx] + margin_ident){
 						is_select_pair_mtx[index] = 1;
@@ -107,18 +98,6 @@ namespace caffe{
 				}
 			}
 			else if(diff_mtx[index] == 1) {
-				/*
-                //is_select_pair_mtx[index] = 1;
-                
-                
-				//负样本选择内积大于 最小正样本内积
-
-				if(innerProd[index] > min_within_dot[query_idx]) { 
-				//if(diff_mtx[index] > min_within_dot[query_idx] - semi_margin && diff_mtx[index] < min_within_dot[query_idx] + semi_margin){
-				//if(diff_mtx[index] < min_within_dot[query_idx]){ // - semi_margin && diff_mtx[index] < min_within_dot[query_idx] + semi_margin){
-					is_select_pair_mtx[index] = 1;
-				}
-				*/
 				if(nega_select_method == 0){ //HARD
 					if(innerProd[index] > nega_thresholds[query_idx] + margin_diff){
 						is_select_pair_mtx[index] = 1;
@@ -190,12 +169,6 @@ namespace caffe{
             }
 	    }
     }
-	/*
-	template <typename Dtype>
-	bool NPairMultiClassLossLayer<Dtype>::comp(Dtype a, Dtype b){
-		return a > b;
-	}
-	*/
 
 	template <typename Dtype>
 	Dtype NPairMultiClassLossLayer<Dtype>::GetRetrivePerformance(const int query_num, const int global_num, const int gpu_rank, const Dtype* distanceMtx, const Dtype* query_labels, const Dtype* global_labels, const int top_k){
@@ -213,14 +186,7 @@ namespace caffe{
 			//因为这里使用内积作为度量，所以这个距离是越大越相似，因为我们是找到top-k个最像的，所以从大往小排序
 			//最近的肯定是自己，所以top-k我们选择第k+1个作为阈值
 			std::sort(_database_pair_dist.begin(), _database_pair_dist.end(), this->comp);
-            /*
-            LOG(INFO)<<"--------------------------------top:"<<top_k;
-            LOG(INFO)<<"SELF DIST:" << distanceMtx[this_query_dist_begin_idx + gpu_rank * query_num + q_idx];
             
-            for(int i=0;i<4 ;i++){ //_database_pair_dist.size();i++){
-                LOG(INFO)<<i<<":"<<_database_pair_dist[i];
-            }
-            */
 			Dtype threshold = _database_pair_dist[std::min(top_k, (int)_database_pair_dist.size() - 1)];
 			Dtype max = _database_pair_dist[0], min = _database_pair_dist[_database_pair_dist.size()-1];
 
@@ -241,80 +207,17 @@ namespace caffe{
 	template <typename Dtype>
 	void NPairMultiClassLossLayer<Dtype>::Forward_gpu(const vector<Blob<Dtype>*>& bottom,
 		const vector<Blob<Dtype>*>& top) {
-		/*
-		this->_num = bottom[0]->num();
-		this->_channel = bottom[0]->channels();
-		this->_height = bottom[0]->height();
-		this->_width = bottom[0]->width();
-		this->local_feature_ = bottom[0];
-		this->local_label_ = bottom[1];
-		this->total_feature_ = new Blob<Dtype>(local_feature_shape);
-		this->total_label_ = new Blob<Dtype>(local_label_shape);
-		*/
-		//LOG(INFO)<<"FORWARD STEP1 BEGIN";
+		
 		GatherFeatureAndLabel();
-		//LOG(INFO)<<"FORWARD STEP2 BEGIN";
+		
 		int this_query_num = this->_num;
 		int this_database_num = this->_num * Caffe::NUM_GPU; 
 		int fea_dim = this->_channel * this->_height * this->_width;
         int dot_normalizer = 1;//fea_dim;
 
 		caffe_gpu_gemm(CblasNoTrans, CblasTrans, this_query_num, this_database_num, fea_dim, (Dtype)1 / dot_normalizer, this->local_feature_->gpu_data(), this->total_feature_->gpu_data(), (Dtype)0, this->_innerProd.mutable_gpu_data());
-        /*
-        for(int i=0;i<this->_innerProd.count();i++)
-        {
-            if(this->_innerProd.cpu_data()[i] != 0){
-                LOG(INFO) <<i<< "INNER_PROD:" << this->_innerProd.cpu_data()[i];
-            }
-        }
-        */
-		
-
-		/*
-		for(int i=0;i<100;i++){
-			LOG(INFO) <<i<< ",LOCAL_FEATURE:" << this->local_feature_->cpu_data()[i]
-				<< "GLOBAL_FEATURE:" << this->total_feature_->cpu_data()[i]
-				<< "CROSS_DIST_MTX:" << this->_innerProd.cpu_data()[i];
-		}
-		*/
-
-
 
 		GetLabelDiffMtx<Dtype><<<CAFFE_GET_BLOCKS(this_query_num * this_database_num), CAFFE_CUDA_NUM_THREADS>>>(this_query_num * this_database_num, this_query_num, this_database_num, Caffe::RANK, this->local_label_->gpu_data(), this->total_label_->gpu_data(), this->_isIdentType.mutable_gpu_data(), this->_isDiffType.mutable_gpu_data());
-		
-		
-		// Not normalize the distance
-		//identNum = 1;
-		//diffNum = 1;
-		//LOG(INFO)<<"FORWARD STEP3 BEGIN";
-		//Dtype _max_within_dot = -FLT_MAX;
-		//Dtype _max_between_dot = -FLT_MAX;
-
-		//数值统计
-		/* old数值统计，有问题，应该分类别进行统计
-		Dtype _min_within_dot = FLT_MAX;
-		Dtype _max_between_dot = -FLT_MAX;
-		Dtype _max_all_dot = -FLT_MAX;
-		for(int i = 0; i < this_query_num * this_database_num; i++){
-			if( this->_isIdentType.cpu_data()[i] == 1 ) {
-				if(this->_innerProd.cpu_data()[i] < _min_within_dot){
-					_min_within_dot = this->_innerProd.cpu_data()[i];
-				}
-				if(_innerProd.cpu_data()[i] > _max_all_dot) {
-					_max_all_dot = _innerProd.cpu_data()[i];
-				}
-			}
-			else if( this->_isDiffType.cpu_data()[i] == 1 ) {
-				if(this->_innerProd.cpu_data()[i] > _max_between_dot) {
-					_max_between_dot = this->_innerProd.cpu_data()[i];
-				}
-				if(_innerProd.cpu_data()[i] > _max_all_dot) {
-					_max_all_dot = _innerProd.cpu_data()[i];
-				}
-			}
-			
-		}
-		*/
 
 		//新的数值统计20171225
 		//Dtype* _min_with_dot;
@@ -455,18 +358,7 @@ namespace caffe{
 		caffe_gpu_mul(this_query_num * this_database_num, this->_isDiffType.gpu_data(), this->_isSelectPair.gpu_data(), this->_tmp_Select_Diff.mutable_gpu_data());
 		//caffe_gpu_dot(this_query_num * this_database_num, this->_tmp_Select_Diff.gpu_data(), this->_cross_multiplier.gpu_data(), &diffNum);
 		caffe_gpu_gemv(CblasNoTrans, this_query_num, this_database_num, (Dtype)1, this->_tmp_Select_Diff.gpu_data(), this->_cross_multiplier.gpu_data(), (Dtype)0, this->diffNum.mutable_gpu_data());
-		
 
-    /*
-        LOG(INFO)<<"----------------";
-
-
-
-        for(int i=0;i<this_query_num;i++){
-            
-            LOG(INFO)<< "query["<<i<<"], IDENTNUM:"<<this->identNum.cpu_data()[i]<<",DIFFNUM:"<<this->diffNum.cpu_data()[i]<< ",POSITHRE:"<<this->_posi_select_threshold.cpu_data()[i] << ",NEGATHRE"<<this->_nega_select_threshold.cpu_data()[i];
-        }
-    */
 		Dtype loss = 0;
 		if(true) {//(identNum != 0 && diffNum != 0) {
 
@@ -476,28 +368,6 @@ namespace caffe{
 			Minus_Querywise_Maxval<Dtype><<<CAFFE_GET_BLOCKS(this_query_num * this_database_num), CAFFE_CUDA_NUM_THREADS>>>(this_query_num * this_database_num, this_query_num, this_database_num, 
 				_max_all_dot_blob.gpu_data(), this->identNum.gpu_data(), this->diffNum.gpu_data(), this->_isIdentType.gpu_data(), this->_isDiffType.gpu_data(), this->_innerProd.mutable_gpu_data(), this->_innerProd_calPrecision.mutable_gpu_data());
 
-            
-            /*
-            for(int i=0;i<4;i++)
-            {
-                LOG(INFO)<<"INNERPROD"<<i<<"="<<_innerProd_calPrecision.cpu_data()[i];
-            }
-            */
-            
-            
-			//caffe_gpu_add_scalar(this_query_num * this_database_num, (Dtype)(-_max_all_dot), this->_innerProd.mutable_gpu_data());
-			/*
-
-			for(int i=0;i< 100;i++){
-				LOG(INFO)<<"innerprod- step2["<<i<<"]: "<<_max_all_dot << "    "<<this->_innerProd.cpu_data()[i];
-			}
-			*/
-			//caffe_gpu_exp(this_query_num * this_database_num, this->_innerProd.gpu_data(), this->_innerProd.mutable_gpu_data());
-			/*
-			for(int i=0;i< 100;i++){
-				LOG(INFO)<<"innerprod- step3["<<i<<"]: "<<this->_innerProd.cpu_data()[i];
-			}
-			*/
 			//这两个变量改为类内局部变量
 			//loss_ident_value = 0, loss_diff_value = 0;
 			caffe_gpu_mul(this_query_num * this_database_num, this->_innerProd.gpu_data(), this->_tmp_Select_Ident.gpu_data(), _innerProd_temp1.mutable_gpu_data());
@@ -516,26 +386,9 @@ namespace caffe{
             */
             ManipulateDIVandLOG<Dtype><<<CAFFE_GET_BLOCKS(this_query_num), CAFFE_CUDA_NUM_THREADS>>>(this_query_num, this->loss_ident_value.gpu_data(), this->_loss_value_tmp1_sum.gpu_data(), this->_loss_value_tmp2_div.mutable_gpu_data(),
                 this->_loss_value_tmp3_log.mutable_gpu_data());
-            /*
-			caffe_gpu_div(this_query_num, this->loss_ident_value.gpu_data(), this->_loss_value_tmp1_sum.gpu_data(), this->_loss_value_tmp2_div.mutable_gpu_data());
-
-			caffe_gpu_log(this_query_num, this->_loss_value_tmp2_div.gpu_data(), this->_loss_value_tmp3_log.mutable_gpu_data());
-            */
-
-			//LOG(INFO)<<"FORWARD STEP4 BEGIN";
-			//LOG(INFO)<<"loss_ident_value:"<<loss_ident_value<<",identNum:"<<identNum<<",loss_diff_value:"<<loss_diff_value<<",diffNum:"<<diffNum;
-			//loss = -log( (loss_ident_value / identNum) / (loss_ident_value / identNum + loss_diff_value / diffNum) );
-			caffe_gpu_dot(this_query_num, this->_loss_value_tmp3_log.gpu_data(), this->_query_multiplier.gpu_data(), &loss );
+            			caffe_gpu_dot(this_query_num, this->_loss_value_tmp3_log.gpu_data(), this->_query_multiplier.gpu_data(), &loss );
 			loss /= -this_query_num;
 		}
-		/*
-		GetRetrivePerformance(const int query_num, const int global_num, const int query_begin_idx_in_global, const Dtype* distanceMtx, const Dtype* query_labels, const Dtype* global_labels, const int top_k)
-		*/
-        /*
-		Dtype top_1_recall = GetRetrivePerformance(this_query_num, this_database_num, Caffe::RANK , this->_innerProd_calPrecision.cpu_data(), this->local_label_->cpu_data(), this->total_label_->cpu_data(), 1);
-		
-		Dtype top_5_recall = GetRetrivePerformance(this_query_num, this_database_num, Caffe::RANK , this->_innerProd_calPrecision.cpu_data(), this->local_label_->cpu_data(), this->total_label_->cpu_data(), 5);
-        */
 
 		top[0]->mutable_cpu_data()[0] = loss;
 
@@ -551,12 +404,6 @@ namespace caffe{
 
         caffe_gpu_asum(bottom[0]->count(), bottom[0]->gpu_data(), top[top.size() - 1]->mutable_cpu_data());
         top[top.size() - 1]->mutable_cpu_data()[0] /= bottom[0]->num();
-
-        /*
-		top[1]->mutable_cpu_data()[0] = top_1_recall;
-		top[2]->mutable_cpu_data()[0] = top_5_recall;
-        */
-
 	}
 
 
@@ -573,11 +420,6 @@ namespace caffe{
                 else{
 				    new_innerProd_weights[index] = innerProd_type[index] / query_based_weights[query_idx];
                 }
-                /*
-                if(index<4){
-                    printf("index=%d, val=%f",index, new_innerProd_weights[index]);
-                }
-                */
 			}
 		}
 	template <typename Dtype>
@@ -591,27 +433,13 @@ namespace caffe{
 
 		caffe_gpu_set(this_query_num * fea_dim, (Dtype)0, this->local_feature_->mutable_gpu_diff());
 		caffe_gpu_set(this_database_num * fea_dim, (Dtype)0, this->total_feature_->mutable_gpu_diff());
-		//LOG(INFO)<<"BACKWARD STEP2 BEGIN";
-		/*
-		Dtype loss_ident_value = 0, loss_diff_value = 0;
-		//下面四行的值只是求了exp后的加和部分
-		caffe_gpu_mul(this_query_num * this_database_num, this->_innerProd.gpu_data(), this->_isIdentType.gpu_data(), this->_innerProd_temp1.mutable_gpu_data());
-		caffe_gpu_dot(this_query_num * this_database_num, this->_innerProd_temp1.gpu_data(), this->_cross_multiplier.gpu_data(), &loss_ident_value);
-		caffe_gpu_mul(this_query_num * this_database_num, this->_innerProd.gpu_data(), this->_isDiffType.gpu_data(), this->_innerProd_temp2.mutable_gpu_data());
-		caffe_gpu_dot(this_query_num * this_database_num, this->_innerProd_temp2.gpu_data(), this->_cross_multiplier.gpu_data(), &loss_diff_value);
-		*/
-		//int fea_dim = this->_channel * this->_height * this->_width;
 
 		if(true) { //identNum!=0 && diffNum!=0){
 
 
 			Dtype loss_weight = top[0]->cpu_diff()[0];
 			//这里最后加了一个内积对fea_dim的归一化,
-			/*
-			Dtype loss_scalar_part1 = -1 * (identNum / loss_ident_value / identNum) / fea_dim;
-			Dtype loss_scalar_part2 = -1 * (-1 / ( loss_ident_value / identNum + loss_diff_value / diffNum ) / identNum) / fea_dim;
-			Dtype loss_scalar_part3 = -1 * (-1 / ( loss_ident_value / identNum + loss_diff_value / diffNum ) / diffNum) / fea_dim;
-			*/
+
 			Get_Query_Diff_Part<Dtype><<<CAFFE_GET_BLOCKS(this_query_num * this_database_num), CAFFE_CUDA_NUM_THREADS>>>
 				(this_query_num * this_database_num, this_query_num, this_database_num, this->_innerProd_temp1.gpu_data(),this->loss_ident_value.gpu_data(),
 					this->_query_diff_part1_weights.mutable_gpu_data());
@@ -622,11 +450,6 @@ namespace caffe{
 				(this_query_num * this_database_num, this_query_num, this_database_num, this->_innerProd_temp2.gpu_data(),this->_loss_value_tmp1_sum.gpu_data(),
 					this->_query_diff_part3_weights.mutable_gpu_data());
 
-            /*
-            for (int i=0;i<10;i++){
-                LOG(INFO)<<"INDEX["<<i<<"], PART1:"<<_query_diff_part1_weights.cpu_data()[i]<<",PART2:"<<_query_diff_part2_weights.cpu_data()[i]<<",PART3:"<<_query_diff_part3_weights.cpu_data()[i];
-            }
-            */
 			caffe_gpu_gemm(CblasNoTrans, CblasNoTrans, this_query_num, fea_dim, this_database_num,
 				-loss_weight / dot_normalizer, this->_query_diff_part1_weights.gpu_data(), this->total_feature_->gpu_data(), (Dtype)0, this->local_feature_->mutable_gpu_diff());
 			caffe_gpu_gemm(CblasNoTrans, CblasNoTrans, this_query_num, fea_dim, this_database_num,
@@ -641,26 +464,6 @@ namespace caffe{
 			caffe_gpu_gemm(CblasTrans, CblasNoTrans, this_database_num, fea_dim, this_query_num,
 				loss_weight / dot_normalizer, this->_query_diff_part3_weights.gpu_data(), this->local_feature_->gpu_data(), (Dtype)1, this->total_feature_->mutable_gpu_diff());
 			
-			/*
-			caffe_gpu_gemm(CblasNoTrans, CblasNoTrans, this_query_num, fea_dim, this_database_num,
-				loss_weight * loss_scalar_part1, this->_innerProd_temp1.gpu_data(), this->total_feature_->gpu_data(), (Dtype)0, this->local_feature_->mutable_gpu_diff());
-			caffe_gpu_gemm(CblasNoTrans, CblasNoTrans, this_query_num, fea_dim, this_database_num,
-				loss_weight * loss_scalar_part2, this->_innerProd_temp1.gpu_data(), this->total_feature_->gpu_data(), (Dtype)1, this->local_feature_->mutable_gpu_diff());
-			caffe_gpu_gemm(CblasNoTrans, CblasNoTrans, this_query_num, fea_dim, this_database_num,
-				loss_weight * loss_scalar_part3, this->_innerProd_temp2.gpu_data(), this->total_feature_->gpu_data(), (Dtype)1, this->local_feature_->mutable_gpu_diff());
-
-			caffe_gpu_gemm(CblasTrans, CblasNoTrans, this_database_num, fea_dim, this_query_num,
-				loss_weight * loss_scalar_part1, this->_innerProd_temp1.gpu_data(), this->local_feature_->gpu_data(), (Dtype)0, this->total_feature_->mutable_gpu_diff());
-			caffe_gpu_gemm(CblasTrans, CblasNoTrans, this_database_num, fea_dim, this_query_num,
-				loss_weight * loss_scalar_part2, this->_innerProd_temp1.gpu_data(), this->local_feature_->gpu_data(), (Dtype)1, this->total_feature_->mutable_gpu_diff());
-			caffe_gpu_gemm(CblasTrans, CblasNoTrans, this_database_num, fea_dim, this_query_num,
-				loss_weight * loss_scalar_part3, this->_innerProd_temp2.gpu_data(), this->local_feature_->gpu_data(), (Dtype)1, this->total_feature_->mutable_gpu_diff());
-			*/
-			//LOG(INFO)<<"BACKWARD STEP3 BEGIN";
-			/*
-			int MPI_Allreduce(const void *sendbuf, void *recvbuf, int count,
-                  MPI_Datatype datatype, MPI_Op op, MPI_Comm comm)
-                  */
 			if (Caffe::MULTI_GPU) {
 			    int count = this_database_num * fea_dim;//this->total_feature_->count();
 			    //LOG(INFO) << "call mpi_allreduce in rank " << Caffe::RANK;
@@ -697,33 +500,7 @@ namespace caffe{
 					(Dtype)0.5,
 					this->local_feature_->mutable_gpu_diff()
 				);
-           /* 
-            for(int i=0;i<10;i++)
-            {
-                LOG(INFO)<<i<<"diff:"<<this->local_feature_->cpu_diff()[i];
-            }
-            */
-
-            /*
-            //For L1 Normalization
-            Dtype lambda = 0;
-            caffe_gpu_sign(bottom[0]->count(), bottom[0]->gpu_data(), bottom[0]->mutable_gpu_data());
-            caffe_gpu_dot(bottom[0]->count(), bottom[0]->gpu_data(), bottom[0]->gpu_diff(), &lambda);
-            lambda /= -bottom[0]->count();
-            caffe_gpu_axpby(bottom[0]->count(), lambda, bottom[0]->gpu_data(), (Dtype)1, bottom[0]->mutable_gpu_diff());
-            for(int i=0;i<bottom[0]->count();i++){
-                if(bottom[0]->cpu_diff()[i]> 1e-5){
-                    LOG(INFO)<< i << ":" << bottom[0]->cpu_diff()[i];
-                }
-            }
-            */
-
-            
-            
-            
-
 		}
-			
 	}
 
 INSTANTIATE_LAYER_GPU_FUNCS(NPairMultiClassLossLayer);
