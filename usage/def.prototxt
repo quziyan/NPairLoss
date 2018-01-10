@@ -1,0 +1,151 @@
+name: "GoogleNet"
+layer {
+    name: "data_mb"
+    type: "MultibatchData"
+    top: "data_mb"
+    top: "label_type_mb"
+    include {
+        phase: TRAIN
+    }
+    transform_param {
+        mirror: true
+        crop_size: 224
+        mean_value: 104
+        mean_value: 117
+        mean_value: 123
+    }
+    multi_batch_data_param {
+        root_folder: "/home/vis/quzhi/data/4kw_data_coarse_grain/"
+        source: "/home/vis/quzhi/data/labelfile_new/train.txt.exist"
+        #source: "/home/vis/quzhi/data/labelfile_new/val.txt.exist"
+        batch_size: 120
+        shuffle: true
+        new_height: 224
+        new_width: 224
+        identity_num_per_batch: 60
+        img_num_per_identity: 2
+        rand_identity: true
+    }
+}
+
+
+
+layer {
+    name: "data_mb"
+    type: "MultibatchData"
+    top: "data_mb"
+    top: "label_type_mb"
+    include {
+        phase: TEST
+    }
+    transform_param {
+        mirror: true
+        crop_size: 224
+        mean_value: 104
+        mean_value: 117
+        mean_value: 123
+    }
+    multi_batch_data_param {
+        root_folder: "/home/vis/quzhi/data/4kw_data_coarse_grain/"
+        source: "/home/vis/quzhi/data/labelfile_new/val.txt.exist"
+        batch_size: 30
+        shuffle: true
+        new_height: 224
+        new_width: 224
+        identity_num_per_batch: 15
+        img_num_per_identity: 2
+        rand_identity: true
+    }
+}
+
+layer {
+    name: "data_transformer"
+    type: "DataTransformer"
+    bottom: "data_mb"
+    top: "data_mb"
+    include {
+        phase: TRAIN
+    }
+    data_transformer_l_param {
+        delta1_sigma: 0.00000001 #10.5
+        delta2_sigma: 0.00000001 #0.15
+        delta3_sigma: 0.00000001 #1.1 #2.4
+        delta4_sigma: 0.00000001 #1.1 #2.4
+        rotate_angle_scope: 0.349 # 0.698 #40degree 0.349 #20degree
+        translation_w_scope: 70
+        translation_h_scope: 70
+        scale_w_scope: 1.2
+        scale_h_scope: 1.2
+        h_flip: true
+        elastic_transform: false
+        amplitude: 1
+        radius: 1
+    }
+}
+layer {
+  name: "conv1/7x7_s2"
+  type: "Convolution"
+  bottom: "data_mb"
+  top: "conv1/7x7_s2"
+  param {
+    lr_mult: 1
+    decay_mult: 1
+  }
+  param {
+    lr_mult: 2
+    decay_mult: 0
+  }
+  convolution_param {
+    num_output: 64
+    pad: 3
+    kernel_size: 7
+    stride: 2
+    weight_filler {
+      type: "xavier"
+    }
+    bias_filler {
+      type: "constant"
+      value: 0.2
+    }
+  }
+}
+.
+.
+.
+layer {
+    bottom: "pool5/7x7_s1"
+    name: "loss3/pool5/7x7_s1/norm"
+    type: "L2Normalize"
+    top: "loss3/pool5/7x7_s1/norm"
+}
+layer {
+    bottom: "loss3/pool5/7x7_s1/norm"
+    #bottom: "pool5/7x7_s1"
+    bottom: "label_type_mb"
+    name: "loss3/type_mb"
+    type: "NPairMultiClassLoss"
+    top: "loss3/type_npair_mc"
+    top: "loss3/type_npair_mc_retrieve_top1"
+    top: "loss3/type_npair_mc_retrieve_top5"
+    top: "loss3/type_npair_mc_retrieve_top10"
+    top: "loss3/feature_asum"
+    loss_weight: 1
+    loss_weight: 1
+    loss_weight: 1
+    loss_weight: 1
+    loss_weight: 1
+    npair_loss_param {
+        margin_ident: 0.0
+        margin_diff: -0.05
+        identsn: -0.0
+        diffsn: -0.3 #对于绝对选择来说该项无效
+        ap_mining_region: GLOBAL
+        ap_mining_method: RELATIVE_HARD
+        an_mining_region: LOCAL
+        an_mining_method: HARD # RELATIVE_HARD
+    }
+    #loss_weight: 1
+    #include {
+    #    phase: TRAIN
+    #}
+} 

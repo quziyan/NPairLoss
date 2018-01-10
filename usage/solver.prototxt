@@ -1,0 +1,17 @@
+net: "./conf_same_veri/def.prototxt"
+test_iter: 2000
+test_interval: 2000 # 10000
+test_initialization:true # false
+display: 100
+average_loss: 100
+base_lr: 0.001
+lr_policy: "step"
+stepsize: 10000
+gamma: 0.5
+#power: 1
+max_iter: 2000000
+momentum: 0.9
+weight_decay: 0.00002
+snapshot: 5000
+snapshot_prefix: "./snap/googlenet_"
+solver_mode: GPU
