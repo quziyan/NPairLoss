@@ -1,0 +1,23 @@
+
+optional NPairLossParameter npair_loss_param = 8866720;
+message NPairLossParameter {
+    optional float margin_ident = 1 [default = 0];
+    optional float margin_diff = 8 [default = 0];
+    optional float identsn = 2 [default = -1];
+    optional float diffsn = 3 [default = -1];
+    enum MiningRegion {
+        GLOBAL = 0;
+        LOCAL = 1;
+    }
+    enum MiningMethod {
+        HARD = 0;
+        EASY = 1;
+        RAND = 2;
+        RELATIVE_HARD = 3;
+        RELATIVE_EASY= 4;
+    }
+    optional MiningRegion ap_mining_region = 4 [default = LOCAL];
+    optional MiningMethod ap_mining_method = 5 [default = RAND];
+    optional MiningRegion an_mining_region = 6 [default = LOCAL];
+    optional MiningMethod an_mining_method = 7 [default = RAND];
+}
