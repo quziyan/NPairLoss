@@ -378,12 +378,7 @@ namespace caffe{
 			caffe_gpu_gemv(CblasNoTrans, this_query_num, this_database_num, (Dtype)1, this->_innerProd_temp2.gpu_data(), this->_cross_multiplier.gpu_data(), (Dtype)0, this->loss_diff_value.mutable_gpu_data());
 
 			caffe_gpu_add(this_query_num, this->loss_ident_value.gpu_data(), this->loss_diff_value.gpu_data(), this->_loss_value_tmp1_sum.mutable_gpu_data());
-            /*
-            for(int i=0;i<4;i++)
-            {
-                LOG(INFO)<<i<<"identval:"<<this->loss_ident_value.cpu_data()[i]<<",diffval:"<<this->loss_diff_value.cpu_data()[i];
-            }
-            */
+
             ManipulateDIVandLOG<Dtype><<<CAFFE_GET_BLOCKS(this_query_num), CAFFE_CUDA_NUM_THREADS>>>(this_query_num, this->loss_ident_value.gpu_data(), this->_loss_value_tmp1_sum.gpu_data(), this->_loss_value_tmp2_div.mutable_gpu_data(),
                 this->_loss_value_tmp3_log.mutable_gpu_data());
             			caffe_gpu_dot(this_query_num, this->_loss_value_tmp3_log.gpu_data(), this->_query_multiplier.gpu_data(), &loss );
