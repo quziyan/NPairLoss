@@ -135,7 +135,7 @@ namespace caffe{
 					innerProd[index] = 0;//因为相同这块是除数，所以赋值为0就可以，不产生LOSS
 				}
 				else{
-                    //草他妈，这里不应该归一化，真日狗了
+                    
 					innerProd[index] /= 1;//identNum[query_idx];
 				}
 			}
@@ -145,7 +145,7 @@ namespace caffe{
 					innerProd[index] = 0;
 				}
 				else{
-                    //草他妈，这里不应该归一化，真日狗了
+                    
 					innerProd[index] /= 1;//diffNum[query_idx];
 				}
 			}
